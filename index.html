@@ -238,7 +238,10 @@ footer .wrap { display: grid; gap: 6px; }
   body::before { display: none; }
   section.case, .waybill, .result, .compare, figure.diagram, .split, .checks, .retro p, .block li { break-inside: avoid; }
   .retro .label { break-after: avoid; }
-  .block h3, .block h3 .label { break-after: avoid; }
+  .block { display: block; }
+  .block > * + * { margin-top: 10px; }
+  .block h3 { break-inside: avoid; break-after: avoid; page-break-after: avoid; }
+  .block > h3 + ul, .block > h3 + ol, .block > h3 + p { break-before: avoid; }
   /* 흐름도는 인쇄 폭에 맞춰 노드를 줄인다 */
   .case .wrap { gap: 18px; }
   section.case { padding-block: 24px 32px; }
@@ -274,7 +277,7 @@ footer .wrap { display: grid; gap: 6px; }
     <p class="lede">풀필먼트 B2B SaaS에서 4년 6개월 동안 출고·정산·외부 연동을 맡았습니다. 이 페이지는 그중 여섯 가지 문제를 골라 <mark>어떤 문제를 어떤 의도로 풀었고, 무슨 결과를 냈는지</mark>, 그리고 지금이라면 무엇을 다르게 할지 정리한 기록입니다.</p>
     <div class="facts">
       <div><b>주식회사 콜로세움코퍼레이션</b> · 2021.07 – 2025.12 (4년 6개월)</div>
-      <div>월 출고 <b>수백만 건 규모</b> · 셀러 <b>수백 곳</b></div>
+      <div>월 출고 <b>500만여 건</b> · 셀러 <b>300여 곳</b></div>
       <div>Java 8·11 · Spring Boot · JPA · MyBatis · MySQL · Datadog</div>
     </div>
     <div class="contact">contact&nbsp; <span>crowruya@gmail.com</span></div>
@@ -330,12 +333,12 @@ footer .wrap { display: grid; gap: 6px; }
       <div class="layers">
         <div class="layer"><div>REQUEST</div><div><span class="unit">조회 조건</span> 창고·고객사별 조회 조건</div></div>
         <div class="layer"><div>VALIDATE</div><div><span class="unit">검증기</span> 요청과 결과 검증</div></div>
+        <div class="layer"><div>NOTIFY</div><div><span class="unit">Slack</span> 조회 행 1,000건 초과 시 시작 알림</div></div>
         <div class="layer hot"><div>CHUNK</div><div><span class="unit">주문번호 목록</span><span class="unit">1,000건씩</span> 청크마다 IN 조회, 쓰고 나면 비움</div></div>
         <div class="layer hot"><div>FETCH × 6</div><div><span class="unit">B2C</span><span class="unit">상품</span><span class="unit">연동</span><span class="unit">송장</span><span class="unit">출고</span><span class="unit">수취인</span> 데이터 영역별 MetaFetcher</div></div>
         <div class="layer"><div>ASSEMBLE</div><div><span class="unit">조립기</span> 리포트 번호 기준 그룹핑·조립</div></div>
         <div class="layer"><div>STRATEGY</div><div><span class="unit">유형별 전략</span> 리포트 유형별 컬럼·정렬</div></div>
         <div class="layer hot"><div>WRITE</div><div><span class="unit">SXSSF</span><span class="unit">행 윈도 100</span> 스트리밍 쓰기</div></div>
-        <div class="layer"><div>NOTIFY</div><div><span class="unit">Slack</span> 대용량 작업 시작 알림</div></div>
       </div>
       <figcaption>조회·조립·검증·쓰기를 계층으로 나눴습니다. 조회는 1,000건 단위 청크로, 쓰기는 SXSSF로 메모리에 일정 행만 두고, 새 리포트 유형은 전략을 추가해 붙입니다.</figcaption>
     </figure>
@@ -514,7 +517,7 @@ key  : 복합 인덱스</pre>
 
     <div class="result">
       <span class="big">30s → 3ms</span>
-      <p>가장 무거웠던 단일 쿼리가 30초에서 3ms로, 정산 프로시저 단일 실행이 최장 10분에서 1분 이내로 줄었습니다. 순차 처리 구조는 그대로였지만, 다른 운영자가 기다리는 시간도 그만큼 줄었습니다.</p>
+      <p>가장 무거웠던 단일 쿼리가 30초에서 3ms로, 정산 프로시저 단일 실행이 최장 10분에서 1분 이내로 줄었습니다. 순차 처리 구조는 유지했지만, 단일 실행 시간을 줄여 다른 운영자의 정산 대기 부담을 낮췄습니다.</p>
       <span class="basis">기준: 30s → 3ms는 MySQL 8.0에서 복합 인덱스 적용 전후 같은 쿼리의 실행 시간 · 10분 → 1분은 프로시저 단일 실행 처리 시간(인덱스·쿼리 개선 효과)</span>
     </div>
 
