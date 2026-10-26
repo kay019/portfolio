@@ -333,7 +333,7 @@ footer .wrap { display: grid; gap: 6px; }
         <div class="layer"><div>ASSEMBLE</div><div><span class="unit">조립기</span> 리포트 번호 기준 그룹핑·조립</div></div>
         <div class="layer"><div>STRATEGY</div><div><span class="unit">유형별 전략</span> 리포트 유형별 컬럼·정렬</div></div>
         <div class="layer hot"><div>WRITE</div><div><span class="unit">SXSSF</span><span class="unit">행 윈도 100</span> 스트리밍 쓰기</div></div>
-        <div class="layer"><div>NOTIFY</div><div><span class="unit">Slack</span> 생성 결과 알림</div></div>
+        <div class="layer"><div>NOTIFY</div><div><span class="unit">Slack</span> 대용량 작업 시작 알림</div></div>
       </div>
       <figcaption>조회·조립·검증·쓰기를 계층으로 나눴습니다. 조회는 1,000건 단위 청크로, 쓰기는 SXSSF로 메모리에 일정 행만 두고, 새 리포트 유형은 전략을 추가해 붙입니다.</figcaption>
     </figure>
@@ -345,7 +345,7 @@ footer .wrap { display: grid; gap: 6px; }
         <li><b>스트리밍 쓰기</b>: <span class="mono">SXSSFWorkbook</span>의 행 윈도 크기를 100으로 두어, 워크북의 최근 100행만 메모리에 두고 나머지는 임시 파일로 내보내며 썼고, 임시 파일은 <span class="mono">finally</span>에서 정리했습니다.</li>
         <li><b>리플렉션</b>: 셀마다 하던 필드 조회를 컬럼별로 한 번 만드는 함수 캐시로 바꿔 반복 조회를 줄였습니다.</li>
         <li><b>확장</b>: 데이터 영역별 MetaFetcher 6종과 리포트 유형별 전략으로 나눠, 새 유형을 추가해도 생성 흐름은 그대로 둘 수 있게 했습니다.</li>
-        <li><b>알림</b>: 생성 결과는 Slack으로 알렸습니다.</li>
+        <li><b>알림</b>: 1,000건을 넘는 대용량 작업은 시작 시점에 Slack으로 알렸습니다.</li>
         <li><b>테스트</b>: Fetcher·조립기·전략·검증기·서비스를 계층별 단위 테스트로 검증했습니다.</li>
       </ul>
     </div>
@@ -371,7 +371,7 @@ footer .wrap { display: grid; gap: 6px; }
       <div class="label">회고 · 지금이라면</div>
       <p>메모리 문제는 쓰기(SXSSF)와 조회(청크) 두 단계 모두에서 다뤄야 했습니다.</p>
       <p>AI와 함께하니 혼자서는 다 따져보기 어려운 대안까지 비교할 수 있었지만, 어느 안을 고를지는 기존 구조와 운영 제약을 아는 사람이 정해야 했습니다.</p>
-      <p>남은 약점도 있습니다. 주문번호 키 목록은 여전히 전체를 메모리에 올리고, MyBatis Cursor나 <span class="mono">fetchSize</span>는 쓰지 않았습니다. 생성은 동기이고 동시 생성 제한이 없습니다. 지금이라면 키 목록까지 없애고 keyset 페이지네이션이나 Cursor로 끝까지 스트리밍하고, 비동기 큐로 동시 생성 수를 제한하겠습니다.</p>
+      <p>남은 약점도 있습니다. 주문번호 키 목록은 여전히 전체를 메모리에 올리고, MyBatis Cursor나 <span class="mono">fetchSize</span>는 쓰지 않았습니다. 제가 만든 생성 경로는 동기였고 동시 생성 제한이 없었습니다(이후 팀에서 비동기 생성 경로를 더했습니다). 주문번호 키를 뽑는 쿼리에 DISTINCT가 빠져, 청크 경계에 걸린 주문이 두 번 찍힐 수 있다는 것도 뒤늦게 확인했습니다. 지금이라면 키 목록까지 없애고 keyset 페이지네이션이나 Cursor로 끝까지 스트리밍하고, 비동기 큐로 동시 생성 수를 제한하겠습니다.</p>
     </div>
   </div>
 </section>
