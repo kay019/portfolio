@@ -231,6 +231,7 @@ footer .wrap { display: grid; gap: 6px; }
   html { scroll-behavior: smooth; }
 }
 @media print {
+  pre.code { white-space: pre-wrap; overflow-wrap: anywhere; overflow: visible; }
   .nav { display: none; }
   body::before { display: none; }
   section.case, .waybill, .result, .compare, figure.diagram { break-inside: avoid; }
@@ -243,11 +244,11 @@ footer .wrap { display: grid; gap: 6px; }
   <div class="wrap">
     <strong>김정훈</strong>
     <a href="#sync">연동 배치</a>
+    <a href="#cancel">출고 취소 이관</a>
     <a href="#report">대용량 리포트</a>
     <a href="#settle">정산 쿼리</a>
     <a href="#logging">로깅 개편</a>
     <a href="#global">해외 출고 검증</a>
-    <a href="#cancel">출고 취소 이관</a>
     <a href="#more">그 밖의 작업</a>
     <a href="#side">개인 프로젝트</a>
   </div>
@@ -278,7 +279,7 @@ footer .wrap { display: grid; gap: 6px; }
           <tr><td>정산 프로시저</td><td class="num">10분 → 1분 이내</td><td>단일 실행 처리 시간</td></tr>
           <tr><td>연동 관련 셀러 문의</td><td class="num">월 50 → 10건 (80% 감소)</td><td>월 셀러 문의 건수</td></tr>
           <tr><td>운영 요청</td><td class="num">월 90 → 40건 (약 56% 감소)</td><td>개발팀에 들어오던 건수</td></tr>
-          <tr><td>로그 수집량</td><td class="num">월 약 1,000만 → 약 10만 건</td><td>Datadog 월 수집 건수</td></tr>
+          <tr><td>로그 수집량</td><td class="num">월 약 1,000만 → 약 10만 건</td><td>Datadog 월 수집 건수 · 요청 단위 traceId 추적 확보</td></tr>
           <tr><td>대용량 리포트</td><td class="num">최대 100만 행</td><td>엑셀 행 기준, OOM 없음</td></tr>
         </tbody>
       </table>
@@ -349,6 +350,92 @@ footer .wrap { display: grid; gap: 6px; }
     <div class="retro">
       <div class="label">회고</div>
       <p>자동화는 어디서 멈출지 정해야 끝납니다. 끝을 정하지 않은 재시도는 같은 실패를 반복할 뿐이라, 사람에게 넘기는 지점까지 설계에 넣어야 했습니다.</p>    </div>
+  </div>
+</section>
+
+<!-- 사례: 출고 취소 -->
+<section class="case" id="cancel" aria-labelledby="cancel-title">
+  <div class="wrap">
+    <div class="waybill">
+      <div>
+        <div class="label">Case · 정합성</div>
+        <h2 id="cancel-title">출고 취소를 프로시저에서 Java 서비스로</h2>
+        <p class="sub">취소 로직을 보이는 곳으로 꺼내 단계별로 검증했고, 남은 한계도 함께 적었습니다.</p>
+      </div>
+      <div class="meta"><div><b>2022.12</b></div><div>역할 <b>담당</b></div></div>
+      <div class="tickets">
+        <span class="chip stack">Spring</span><span class="chip stack">@Transactional</span><span class="chip stack">MyBatis</span><span class="chip stack">MySQL</span>
+      </div>
+    </div>
+
+    <div class="block">
+      <h3><span class="label">문제</span>취소가 겹치면 중간 상태가 어긋났습니다</h3>
+      <p>출고 취소는 DB 취소 프로시저 2개 안에 있었습니다. 같은 출고에 취소가 겹치면 회차·주문·상품 사이의 상태가 어긋났는데, 로직이 프로시저 안에 있어 어디서 어긋나는지 보기 어려웠습니다.</p>
+    </div>
+
+    <div class="block">
+      <h3><span class="label">목표</span>보이게 꺼내고, 한 번에 맞게</h3>
+      <p>취소 로직을 프로시저에서 코드로 꺼내 어디서 상태가 어긋나는지 보이게 하고, 회차·주문·상품 상태가 함께 바뀌게 하는 것이 목표였습니다.</p>
+    </div>
+
+    <figure class="diagram">
+      <div class="flow">
+        <div class="node"><b>단계별 상태 검증</b><span class="mono">이미 취소·출고 완료면<br>오류 코드로 거부</span></div>
+        <div class="arrow"></div>
+        <div class="node hot"><b>한 트랜잭션 갱신</b><span class="mono">회차·주문·상품을 함께,<br>실패하면 함께 롤백</span></div>
+        <div class="arrow"></div>
+        <div class="node"><b>배포 후 보완</b><span class="mono">상품 단위 중복 취소 차단<br>등 핫픽스 3건</span></div>
+      </div>
+      <figcaption>갱신 전에 회차·주문·상품 단계별 상태를 확인하고, 갱신은 서비스 단위 트랜잭션 하나로 묶었습니다.</figcaption>
+    </figure>
+
+    <div class="block">
+      <h3><span class="label">설계와 구현</span>프로시저를 걷어내고 단계를 나눴습니다</h3>
+      <ul>
+        <li>취소 프로시저를 제거하고, 회차 전체 취소와 주문 단위 취소를 Java 서비스 메서드로 나눴습니다.</li>
+        <li>갱신 전에 회차·주문·상품 단계별 상태를 조회해, 이미 취소됐거나 출고가 끝난 건은 각각의 오류 코드로 거부했습니다.</li>
+        <li>서비스에 클래스 단위 <span class="mono">@Transactional</span>을 걸어, 중간에 실패하면 회차·주문·상품 갱신이 함께 롤백되게 했습니다.</li>
+        <li>배포 뒤에는 상품 단위 중복 취소 차단, 출고 신청 중 취소 오류와 빈 <span class="mono">IN ()</span> 조건 방지, 신청 도중 이탈한 건 처리를 핫픽스로 보완했습니다.</li>
+      </ul>
+    </div>
+
+    <div class="compare">
+      <div>
+        <span class="label before">당시 구현 · 조회 후 갱신</span>
+        <span class="example-tag">개념 예시</span>
+        <pre class="code"><span class="c">-- 1) 상태를 먼저 조회해 검증</span>
+SELECT status FROM out_order WHERE id = ?;
+<span class="c">-- 이미 취소·완료면 예외</span>
+
+<span class="c">-- 2) 사용 중인 행만 조건으로 갱신</span>
+UPDATE out_order SET status = '취소'
+ WHERE id = ? AND 사용여부 = 'Y';
+<span class="c">-- 갱신 0건이어도 그대로 진행</span></pre>
+        <p>검증과 갱신이 두 단계로 나뉘어, 동시에 들어온 요청이 둘 다 검증을 통과할 수 있었습니다. 갱신 건수가 0이어도 실패로 보지 않았습니다.</p>
+      </div>
+      <div>
+        <span class="label after">지금이라면</span>
+        <span class="example-tag">개념 예시</span>
+        <pre class="code"><span class="c">-- 현재 상태를 갱신 조건에 건다</span>
+UPDATE out_order SET status = '취소'
+ WHERE id = ? AND status = ?;
+
+<span class="c">-- 0건이면 예외 → 트랜잭션 전체 롤백</span></pre>
+        <p>확인과 갱신을 한 문장으로 합치고 갱신 건수를 확인해, 동시에 온 요청 중 하나만 상태를 바꾸게 하겠습니다.</p>
+      </div>
+    </div>
+
+    <div class="result">
+      <span class="big" style="white-space:normal">중복 취소 거부·부분 갱신 방지</span>
+      <p>이미 취소·완료된 건을 거부하고 회차·주문·상품 갱신을 한 트랜잭션으로 묶어, 순서대로 들어온 중복 취소와 부분 갱신을 막았습니다.</p>
+      <span class="basis">2022.12 이관, 이후 핫픽스 3건 포함</span>
+    </div>
+
+    <div class="retro">
+      <div class="label">회고 · 지금이라면</div>
+      <p>로직을 프로시저에서 꺼내자 어디서 상태가 어긋나는지 보이기 시작했습니다. 이 결론은 이후 정산 로직을 애플리케이션으로 옮길 때도 그대로 이어졌습니다.</p>
+      <p>다만 검증을 조회 후 갱신으로 했기 때문에 동시 요청에는 열려 있었고, 갱신 건수도 확인하지 않았습니다. 순서대로 들어오는 요청만 막는 검증은 동시성 방어가 아니라는 것을 이 사례로 정리했습니다.</p>
+    </div>
   </div>
 </section>
 
@@ -490,7 +577,8 @@ key  : NULL     <span class="c">← 쓸 인덱스 없음</span></pre>
       <div>
         <span class="label after">After · 실행계획</span>
         <span class="example-tag">개념 예시</span>
-        <pre class="code">CREATE INDEX … ON 정산_대상 (조인 컬럼, 조회 컬럼);
+        <pre class="code">CREATE INDEX … ON 정산_대상
+  (조인 컬럼, 조회 컬럼);
 
 type : ref      <span class="c">← 인덱스 키 값으로 조회</span>
 key  : 복합 인덱스</pre>
@@ -664,92 +752,6 @@ MDC.put("traceId", UUID)
     <div class="retro">
       <div class="label">회고</div>
       <p>2022년 말 엑셀 업로드 오류 위치를 '열'에서 '행' 기준으로 바꾸면서 시작한 고민이었습니다. 오류는 늦게 발견할수록 비쌉니다. 창고에서 막는 것보다 셀러가 입력하는 순간에 막는 쪽이 현장의 일을 줄였습니다.</p>
-    </div>
-  </div>
-</section>
-
-<!-- 사례: 출고 취소 -->
-<section class="case" id="cancel" aria-labelledby="cancel-title">
-  <div class="wrap">
-    <div class="waybill">
-      <div>
-        <div class="label">Case · 정합성</div>
-        <h2 id="cancel-title">출고 취소를 프로시저에서 Java 서비스로</h2>
-        <p class="sub">취소 로직을 보이는 곳으로 꺼내 단계별로 검증했고, 남은 한계도 함께 적었습니다.</p>
-      </div>
-      <div class="meta"><div><b>2022.12</b></div><div>역할 <b>담당</b></div></div>
-      <div class="tickets">
-        <span class="chip stack">Spring</span><span class="chip stack">@Transactional</span><span class="chip stack">MyBatis</span><span class="chip stack">MySQL</span>
-      </div>
-    </div>
-
-    <div class="block">
-      <h3><span class="label">문제</span>취소가 겹치면 중간 상태가 어긋났습니다</h3>
-      <p>출고 취소는 DB 취소 프로시저 2개 안에 있었습니다. 같은 출고에 취소가 겹치면 회차·주문·상품 사이의 상태가 어긋났는데, 로직이 프로시저 안에 있어 어디서 어긋나는지 보기 어려웠습니다.</p>
-    </div>
-
-    <div class="block">
-      <h3><span class="label">목표</span>보이게 꺼내고, 한 번에 맞게</h3>
-      <p>취소 로직을 프로시저에서 코드로 꺼내 어디서 상태가 어긋나는지 보이게 하고, 회차·주문·상품 상태가 함께 바뀌게 하는 것이 목표였습니다.</p>
-    </div>
-
-    <figure class="diagram">
-      <div class="flow">
-        <div class="node"><b>단계별 상태 검증</b><span class="mono">이미 취소·출고 완료면<br>오류 코드로 거부</span></div>
-        <div class="arrow"></div>
-        <div class="node hot"><b>한 트랜잭션 갱신</b><span class="mono">회차·주문·상품을 함께,<br>실패하면 함께 롤백</span></div>
-        <div class="arrow"></div>
-        <div class="node"><b>배포 후 보완</b><span class="mono">상품 단위 중복 취소 차단<br>등 핫픽스 3건</span></div>
-      </div>
-      <figcaption>갱신 전에 회차·주문·상품 단계별 상태를 확인하고, 갱신은 서비스 단위 트랜잭션 하나로 묶었습니다.</figcaption>
-    </figure>
-
-    <div class="block">
-      <h3><span class="label">설계와 구현</span>프로시저를 걷어내고 단계를 나눴습니다</h3>
-      <ul>
-        <li>취소 프로시저를 제거하고, 회차 전체 취소와 주문 단위 취소를 Java 서비스 메서드로 나눴습니다.</li>
-        <li>갱신 전에 회차·주문·상품 단계별 상태를 조회해, 이미 취소됐거나 출고가 끝난 건은 각각의 오류 코드로 거부했습니다.</li>
-        <li>서비스에 클래스 단위 <span class="mono">@Transactional</span>을 걸어, 중간에 실패하면 회차·주문·상품 갱신이 함께 롤백되게 했습니다.</li>
-        <li>배포 뒤에는 상품 단위 중복 취소 차단, 출고 신청 중 취소 오류와 빈 <span class="mono">IN ()</span> 조건 방지, 신청 도중 이탈한 건 처리를 핫픽스로 보완했습니다.</li>
-      </ul>
-    </div>
-
-    <div class="compare">
-      <div>
-        <span class="label before">당시 구현 · 조회 후 갱신</span>
-        <span class="example-tag">개념 예시</span>
-        <pre class="code"><span class="c">-- 1) 상태를 먼저 조회해 검증</span>
-SELECT status FROM out_order WHERE id = ?;
-<span class="c">-- 이미 취소·완료면 예외</span>
-
-<span class="c">-- 2) 사용 중인 행만 조건으로 갱신</span>
-UPDATE out_order SET status = '취소'
- WHERE id = ? AND 사용여부 = 'Y';
-<span class="c">-- 갱신 0건이어도 그대로 진행</span></pre>
-        <p>검증과 갱신이 두 단계로 나뉘어, 동시에 들어온 요청이 둘 다 검증을 통과할 수 있었습니다. 갱신 건수가 0이어도 실패로 보지 않았습니다.</p>
-      </div>
-      <div>
-        <span class="label after">지금이라면</span>
-        <span class="example-tag">개념 예시</span>
-        <pre class="code"><span class="c">-- 현재 상태를 갱신 조건에 건다</span>
-UPDATE out_order SET status = '취소'
- WHERE id = ? AND status = ?;
-
-<span class="c">-- 0건이면 예외 → 트랜잭션 전체 롤백</span></pre>
-        <p>확인과 갱신을 한 문장으로 합치고 갱신 건수를 확인해, 동시에 온 요청 중 하나만 상태를 바꾸게 하겠습니다.</p>
-      </div>
-    </div>
-
-    <div class="result">
-      <span class="big" style="white-space:normal">중복 취소 거부·부분 갱신 방지</span>
-      <p>이미 취소·완료된 건을 거부하고 회차·주문·상품 갱신을 한 트랜잭션으로 묶어, 순서대로 들어온 중복 취소와 부분 갱신을 막았습니다.</p>
-      <span class="basis">2022.12 이관, 이후 핫픽스 3건 포함</span>
-    </div>
-
-    <div class="retro">
-      <div class="label">회고 · 지금이라면</div>
-      <p>로직을 프로시저에서 꺼내자 어디서 상태가 어긋나는지 보이기 시작했습니다. 이 결론은 이후 정산 로직을 애플리케이션으로 옮길 때도 그대로 이어졌습니다.</p>
-      <p>다만 검증을 조회 후 갱신으로 했기 때문에 동시 요청에는 열려 있었고, 갱신 건수도 확인하지 않았습니다. 순서대로 들어오는 요청만 막는 검증은 동시성 방어가 아니라는 것을 이 사례로 정리했습니다.</p>
     </div>
   </div>
 </section>
