@@ -247,7 +247,7 @@ footer .wrap { display: grid; gap: 6px; }
     <a href="#settle">정산 쿼리</a>
     <a href="#logging">로깅 개편</a>
     <a href="#global">해외 출고 검증</a>
-    <a href="#cancel">출고 취소·이중 출고</a>
+    <a href="#cancel">출고 취소 이관</a>
     <a href="#more">그 밖의 작업</a>
     <a href="#side">개인 프로젝트</a>
   </div>
@@ -279,7 +279,7 @@ footer .wrap { display: grid; gap: 6px; }
           <tr><td>연동 관련 셀러 문의</td><td class="num">월 50 → 10건 (80% 감소)</td><td>월 셀러 문의 건수</td></tr>
           <tr><td>운영 요청</td><td class="num">월 90 → 40건 (약 56% 감소)</td><td>개발팀에 들어오던 건수</td></tr>
           <tr><td>로그 수집량</td><td class="num">월 약 1,000만 → 약 10만 건</td><td>Datadog 월 수집 건수</td></tr>
-          <tr><td>대용량 리포트</td><td class="num">최대 100만 행</td><td>엑셀 행 기준, OOM 없음, 인프라 증설 없음</td></tr>
+          <tr><td>대용량 리포트</td><td class="num">최대 100만 행</td><td>엑셀 행 기준, OOM 없음</td></tr>
         </tbody>
       </table>
     </div>
@@ -348,7 +348,7 @@ footer .wrap { display: grid; gap: 6px; }
 
     <div class="retro">
       <div class="label">회고</div>
-      <p>같은 증상에 패치를 덧대기보다, 실패가 어떤 상태로 끝나는지부터 나누는 게 먼저였습니다. 상태가 정해지자 처리 방법이 정해졌고, 연동사가 늘어도 같은 흐름에 끼워 넣을 수 있었습니다.</p>    </div>
+      <p>자동화는 어디서 멈출지 정해야 끝납니다. 끝을 정하지 않은 재시도는 같은 실패를 반복할 뿐이라, 사람에게 넘기는 지점까지 설계에 넣어야 했습니다.</p>    </div>
   </div>
 </section>
 
@@ -359,7 +359,7 @@ footer .wrap { display: grid; gap: 6px; }
       <div>
         <div class="label">Case · 대용량 처리</div>
         <h2 id="report-title">대용량 엑셀 리포트 모듈 설계</h2>
-        <p class="sub">워크북을 통째로 메모리에 올리지 않는 구조로, 100만 행 리포트를 서버 증설 없이 열었습니다.</p>
+        <p class="sub">조회는 청크로, 쓰기는 스트리밍으로 나눠 100만 행 리포트를 OOM 없이 열었습니다.</p>
       </div>
       <div class="meta"><div><b>2025.06 – 2025.09</b></div><div>역할 <b>주도</b></div></div>
       <div class="tickets">
@@ -373,26 +373,28 @@ footer .wrap { display: grid; gap: 6px; }
     </div>
 
     <div class="block">
-      <h3><span class="label">목표</span>증설 없이 버티고, 유형이 늘어도 흐름은 그대로</h3>
-      <p>인프라를 늘리지 않고 대용량 리포트를 안정적으로 만들고, 리포트 유형이 늘어도 변경 범위가 작게 유지되는 구조를 목표로 했습니다.</p>
+      <h3><span class="label">목표</span>대용량을 버티고, 유형이 늘어도 흐름은 그대로</h3>
+      <p>대용량 리포트를 OOM 없이 안정적으로 만들고, 리포트 유형이 늘어도 변경 범위가 작게 유지되는 구조를 목표로 했습니다.</p>
     </div>
 
     <figure class="diagram">
       <div class="layers">
         <div class="layer"><div>REQUEST</div><div><span class="unit">조회 조건</span> 창고·고객사별 조회 조건</div></div>
         <div class="layer"><div>VALIDATE</div><div><span class="unit">검증기</span> 요청과 결과 검증</div></div>
+        <div class="layer hot"><div>CHUNK</div><div><span class="unit">주문번호 목록</span><span class="unit">1,000건씩</span> 청크마다 IN 조회, 쓰고 나면 비움</div></div>
         <div class="layer hot"><div>FETCH × 6</div><div><span class="unit">B2C</span><span class="unit">상품</span><span class="unit">연동</span><span class="unit">송장</span><span class="unit">출고</span><span class="unit">수취인</span> 데이터 영역별 MetaFetcher</div></div>
         <div class="layer"><div>ASSEMBLE</div><div><span class="unit">조립기</span> 리포트 번호 기준 그룹핑·조립</div></div>
         <div class="layer"><div>STRATEGY</div><div><span class="unit">유형별 전략</span> 리포트 유형별 컬럼·정렬</div></div>
         <div class="layer hot"><div>WRITE</div><div><span class="unit">SXSSF</span><span class="unit">행 윈도 100</span> 스트리밍 쓰기</div></div>
         <div class="layer"><div>NOTIFY</div><div><span class="unit">Slack</span> 생성 결과 알림</div></div>
       </div>
-      <figcaption>조회·조립·검증·쓰기를 계층으로 나눴습니다. 쓰기는 SXSSF로 메모리에 일정 행만 두고, 새 리포트 유형은 전략을 추가해 붙입니다.</figcaption>
+      <figcaption>조회·조립·검증·쓰기를 계층으로 나눴습니다. 조회는 1,000건 단위 청크로, 쓰기는 SXSSF로 메모리에 일정 행만 두고, 새 리포트 유형은 전략을 추가해 붙입니다.</figcaption>
     </figure>
 
     <div class="block">
       <h3><span class="label">설계와 구현</span>워크북 전체를 메모리에 유지하지 않는 것이 핵심이었습니다</h3>
       <ul>
+        <li><b>청크 조회</b>: 주문번호 목록만 먼저 받고, 1,000건씩 잘라 그 청크의 행만 IN으로 조회해 조립·쓰기를 마친 뒤 리스트를 비웠습니다. 2025.07 첫 버전은 조회 결과 전체를 List로 받았는데, 1주 뒤 이 방식으로 바꿨습니다.</li>
         <li><b>스트리밍 쓰기</b>: <span class="mono">SXSSFWorkbook</span>의 행 윈도 크기를 100으로 두어, 워크북의 최근 100행만 메모리에 두고 나머지는 임시 파일로 내보내며 썼고, 임시 파일은 <span class="mono">finally</span>에서 정리했습니다.</li>
         <li><b>리플렉션</b>: 셀마다 하던 필드 조회를 컬럼별로 한 번 만드는 함수 캐시로 바꿔 반복 조회를 줄였습니다.</li>
         <li><b>확장</b>: 데이터 영역별 MetaFetcher 6종과 리포트 유형별 전략으로 나눠, 새 유형을 추가해도 생성 흐름은 그대로 둘 수 있게 했습니다.</li>
@@ -405,7 +407,7 @@ footer .wrap { display: grid; gap: 6px; }
       <h3><span class="label">AI와 협업한 방식</span>제안은 AI가, 판단과 검증은 제가</h3>
       <ol>
         <li><b>요구사항 구조화</b>: 기획서를 API·DTO·검증·테스트 단위로 나눴습니다.</li>
-        <li><b>대안 비교</b>: SXSSF의 flush·임시 파일 관리, 청크 단위 조회, HTTP 스트리밍 응답, ECS 요청 시간 제한을 놓고 장단점을 따졌습니다. 그중 SXSSF 스트리밍 쓰기를 적용했습니다.</li>
+        <li><b>대안 비교</b>: SXSSF의 flush·임시 파일 관리, 청크 단위 조회, HTTP 스트리밍 응답, ECS 요청 시간 제한을 놓고 장단점을 따졌습니다. 그중 SXSSF 스트리밍 쓰기와 청크 단위 조회를 적용했습니다.</li>
         <li><b>구현과 리팩터링</b>: 확정한 구조로 계층별 코드를 작성하고 다듬었습니다.</li>
         <li><b>검증</b>: 반영한 코드는 계층별 단위 테스트로 확인했습니다.</li>
         <li><b>채택·보류 판단</b>: 기존 구조와 운영 환경에 맞는 제안만 반영했고, 일부 리팩터링 제안은 보류했습니다.</li>
@@ -414,14 +416,15 @@ footer .wrap { display: grid; gap: 6px; }
 
     <div class="result">
       <span class="big">100만 행</span>
-      <p>엑셀 행 기준 최대 100만 행 리포트를 인프라 증설 없이, OOM 없이 운영에 내놓았습니다.</p>
+      <p>엑셀 행 기준 최대 100만 행 리포트를 OOM 없이 운영에 내놓았습니다.</p>
       <span class="basis">기준: 엑셀 행 수</span>
     </div>
 
     <div class="retro">
-      <div class="label">회고</div>
-      <p>메모리 문제는 워크북 전체를 메모리에 두지 않고 스트리밍으로 쓰는 구조로 막았습니다.</p>
+      <div class="label">회고 · 지금이라면</div>
+      <p>메모리 문제는 쓰기(SXSSF)와 조회(청크) 두 단계 모두에서 다뤄야 했습니다.</p>
       <p>AI와 함께하니 혼자서는 다 따져보기 어려운 대안까지 비교할 수 있었지만, 어느 안을 고를지는 기존 구조와 운영 제약을 아는 사람이 정해야 했습니다.</p>
+      <p>남은 약점도 있습니다. 주문번호 키 목록은 여전히 전체를 메모리에 올리고, MyBatis Cursor나 <span class="mono">fetchSize</span>는 쓰지 않았습니다. 생성은 동기이고 동시 생성 제한이 없습니다. 지금이라면 키 목록까지 없애고 keyset 페이지네이션이나 Cursor로 끝까지 스트리밍하고, 비동기 큐로 동시 생성 수를 제한하겠습니다.</p>
     </div>
   </div>
 </section>
@@ -460,7 +463,7 @@ footer .wrap { display: grid; gap: 6px; }
         <div class="arrow"></div>
         <div class="node"><b>쿼리 재작성</b><span class="mono">조인절·WHERE절</span></div>
         <div class="arrow"></div>
-        <div class="node"><b>전후 측정</b><span class="mono">인덱스 적용 전후,<br>쿼리 캐시 없음</span></div>
+        <div class="node"><b>전후 측정</b><span class="mono">MySQL 8.0에서<br>인덱스 적용 전후</span></div>
       </div>
       <figcaption>실행계획에서 찾은 병목에 인덱스와 쿼리 수정을 적용하고, 같은 쿼리로 전후를 쟀습니다.</figcaption>
     </figure>
@@ -489,7 +492,7 @@ key  : NULL     <span class="c">← 쓸 인덱스 없음</span></pre>
         <span class="example-tag">개념 예시</span>
         <pre class="code">CREATE INDEX … ON 정산_대상 (조인 컬럼, 조회 컬럼);
 
-type : ref      <span class="c">← 인덱스로 범위 접근</span>
+type : ref      <span class="c">← 인덱스 키 값으로 조회</span>
 key  : 복합 인덱스</pre>
         <p>자주 쓰는 조회·조인 컬럼을 묶은 복합 인덱스로, 필요한 범위만 읽게 했습니다.</p>
       </div>
@@ -498,7 +501,7 @@ key  : 복합 인덱스</pre>
     <div class="result">
       <span class="big">30s → 3ms</span>
       <p>가장 무거웠던 단일 쿼리가 30초에서 3ms로, 정산 프로시저 단일 실행이 최장 10분에서 1분 이내로 줄었습니다.</p>
-      <span class="basis">기준: 30s → 3ms는 복합 인덱스 적용 전후 같은 쿼리의 실행 시간(쿼리 캐시 없음) · 10분 → 1분은 프로시저 단일 실행 처리 시간(인덱스·쿼리 개선 효과)</span>
+      <span class="basis">기준: 30s → 3ms는 MySQL 8.0에서 복합 인덱스 적용 전후 같은 쿼리의 실행 시간 · 10분 → 1분은 프로시저 단일 실행 처리 시간(인덱스·쿼리 개선 효과)</span>
     </div>
 
     <div class="retro">
@@ -665,25 +668,29 @@ MDC.put("traceId", UUID)
   </div>
 </section>
 
-<!-- 사례: 출고 취소·이중 출고 -->
+<!-- 사례: 출고 취소 -->
 <section class="case" id="cancel" aria-labelledby="cancel-title">
   <div class="wrap">
     <div class="waybill">
       <div>
         <div class="label">Case · 정합성</div>
-        <h2 id="cancel-title">조회 후 갱신의 한계를 두 번 겪고 배운 것</h2>
-        <p class="sub">출고 취소를 프로시저에서 꺼내 단계별로 검증했고, 같은 구조의 한계가 이중 출고 대응에서 다시 드러났습니다.</p>
+        <h2 id="cancel-title">출고 취소를 프로시저에서 Java 서비스로</h2>
+        <p class="sub">취소 로직을 보이는 곳으로 꺼내 단계별로 검증했고, 남은 한계도 함께 적었습니다.</p>
       </div>
-      <div class="meta"><div>출고 취소 <b>2022.12 · 담당</b></div><div>이중 출고 <b>팀 대응 참여</b></div></div>
+      <div class="meta"><div><b>2022.12</b></div><div>역할 <b>담당</b></div></div>
       <div class="tickets">
-        <span class="chip">네이버 쇼핑</span>
-        <span class="chip stack">Spring</span><span class="chip stack">@Transactional</span><span class="chip stack">MyBatis</span><span class="chip stack">MySQL</span><span class="chip stack">Datadog</span>
+        <span class="chip stack">Spring</span><span class="chip stack">@Transactional</span><span class="chip stack">MyBatis</span><span class="chip stack">MySQL</span>
       </div>
     </div>
 
     <div class="block">
-      <h3><span class="label">1 · 출고 취소 이관 · 문제</span>취소가 겹치면 중간 상태가 어긋났습니다</h3>
-      <p>출고 취소는 DB 취소 프로시저 2개 안에 있었습니다. 같은 출고에 취소가 겹치면 회차·주문·상품 사이의 상태가 어긋났는데, 로직이 프로시저 안에 있어 어디서 어긋나는지 보기 어려웠습니다. 목표는 로직을 코드로 꺼내 어긋나는 지점을 보이게 하고, 회차·주문·상품 상태가 함께 바뀌게 하는 것이었습니다.</p>
+      <h3><span class="label">문제</span>취소가 겹치면 중간 상태가 어긋났습니다</h3>
+      <p>출고 취소는 DB 취소 프로시저 2개 안에 있었습니다. 같은 출고에 취소가 겹치면 회차·주문·상품 사이의 상태가 어긋났는데, 로직이 프로시저 안에 있어 어디서 어긋나는지 보기 어려웠습니다.</p>
+    </div>
+
+    <div class="block">
+      <h3><span class="label">목표</span>보이게 꺼내고, 한 번에 맞게</h3>
+      <p>취소 로직을 프로시저에서 코드로 꺼내 어디서 상태가 어긋나는지 보이게 하고, 회차·주문·상품 상태가 함께 바뀌게 하는 것이 목표였습니다.</p>
     </div>
 
     <figure class="diagram">
@@ -698,7 +705,7 @@ MDC.put("traceId", UUID)
     </figure>
 
     <div class="block">
-      <h3><span class="label">1 · 출고 취소 이관 · 설계와 구현</span>프로시저를 걷어내고 단계를 나눴습니다</h3>
+      <h3><span class="label">설계와 구현</span>프로시저를 걷어내고 단계를 나눴습니다</h3>
       <ul>
         <li>취소 프로시저를 제거하고, 회차 전체 취소와 주문 단위 취소를 Java 서비스 메서드로 나눴습니다.</li>
         <li>갱신 전에 회차·주문·상품 단계별 상태를 조회해, 이미 취소됐거나 출고가 끝난 건은 각각의 오류 코드로 거부했습니다.</li>
@@ -707,55 +714,42 @@ MDC.put("traceId", UUID)
       </ul>
     </div>
 
-    <div class="result">
-      <span class="big">중복·부분 취소 차단</span>
-      <p>이미 취소·완료된 건을 거부하고 회차·주문·상품 갱신을 한 트랜잭션으로 묶어, 순서대로 들어온 중복 취소와 부분 갱신을 막았습니다.</p>
-      <span class="basis">2022.12 이관, 이후 핫픽스 3건 포함</span>
-    </div>
-
-    <div class="block">
-      <h3><span class="label">2 · 이중 출고 장애 · 팀 대응 참여</span>같은 주문이 다시 들어와 두 번 출고됐습니다</h3>
-      <p>네이버 쇼핑의 주문번호 체계가 바뀌면서 같은 주문이 다시 수집됐고, 이중 출고가 발생했습니다. 팀으로 대응하며 아래 일을 했습니다.</p>
-      <ul>
-        <li><b>원인 추적</b>: Datadog 로그로 원인을 추적했습니다.</li>
-        <li><b>중복 반영 방지</b>: 주문 상태값을 확인해 같은 상태면 다시 반영하지 않고 기존 데이터를 유지했습니다. 취소와 부분 취소는 따로 처리했습니다.</li>
-        <li><b>화면 방어·기록</b>: 프론트에 더블클릭 방어를 넣고, 팀에 포스트모템을 도입해 원인·처리·후속 대책을 문서로 남겼습니다.</li>
-      </ul>
-      <p>이 경로의 이중 출고는 멈췄지만, 이번에도 상태를 조회한 뒤 갱신하는 방식이라 동시 실행까지 막는 구조적 방어는 아니었습니다.</p>
-    </div>
-
     <div class="compare">
       <div>
-        <span class="label before">두 사례의 당시 구현 · 조회 후 갱신</span>
+        <span class="label before">당시 구현 · 조회 후 갱신</span>
         <span class="example-tag">개념 예시</span>
         <pre class="code"><span class="c">-- 1) 상태를 먼저 조회해 검증</span>
-SELECT status FROM target WHERE id = ?;
-<span class="c">-- 이미 처리된 상태면 거부·건너뜀</span>
+SELECT status FROM out_order WHERE id = ?;
+<span class="c">-- 이미 취소·완료면 예외</span>
 
-<span class="c">-- 2) 상태 조건 없이 갱신</span>
-UPDATE target SET status = ?
- WHERE id = ?;
+<span class="c">-- 2) 사용 중인 행만 조건으로 갱신</span>
+UPDATE out_order SET status = '취소'
+ WHERE id = ? AND 사용여부 = 'Y';
 <span class="c">-- 갱신 0건이어도 그대로 진행</span></pre>
-        <p>검증과 갱신이 두 단계로 나뉘어, 동시에 들어온 요청이 둘 다 검증을 통과할 수 있었습니다.</p>
+        <p>검증과 갱신이 두 단계로 나뉘어, 동시에 들어온 요청이 둘 다 검증을 통과할 수 있었습니다. 갱신 건수가 0이어도 실패로 보지 않았습니다.</p>
       </div>
       <div>
         <span class="label after">지금이라면</span>
         <span class="example-tag">개념 예시</span>
-        <pre class="code"><span class="c">-- 상태 변경: 현재 상태를 조건에 건다</span>
-UPDATE target SET status = ?
+        <pre class="code"><span class="c">-- 현재 상태를 갱신 조건에 건다</span>
+UPDATE out_order SET status = '취소'
  WHERE id = ? AND status = ?;
-<span class="c">-- 0건이면 예외 → 트랜잭션 전체 롤백</span>
 
-<span class="c">-- 수집: 중복은 DB가 거부한다</span>
-UNIQUE (쇼핑몰, 원주문번호)</pre>
-        <p>확인과 갱신을 한 문장으로 합치고 갱신 건수를 확인해, 동시에 온 요청 중 하나만 상태를 바꾸게 하겠습니다. 수집 중복은 UNIQUE 제약으로 막겠습니다.</p>
+<span class="c">-- 0건이면 예외 → 트랜잭션 전체 롤백</span></pre>
+        <p>확인과 갱신을 한 문장으로 합치고 갱신 건수를 확인해, 동시에 온 요청 중 하나만 상태를 바꾸게 하겠습니다.</p>
       </div>
+    </div>
+
+    <div class="result">
+      <span class="big" style="white-space:normal">중복 취소 거부·부분 갱신 방지</span>
+      <p>이미 취소·완료된 건을 거부하고 회차·주문·상품 갱신을 한 트랜잭션으로 묶어, 순서대로 들어온 중복 취소와 부분 갱신을 막았습니다.</p>
+      <span class="basis">2022.12 이관, 이후 핫픽스 3건 포함</span>
     </div>
 
     <div class="retro">
       <div class="label">회고 · 지금이라면</div>
       <p>로직을 프로시저에서 꺼내자 어디서 상태가 어긋나는지 보이기 시작했습니다. 이 결론은 이후 정산 로직을 애플리케이션으로 옮길 때도 그대로 이어졌습니다.</p>
-      <p>다만 두 사례 모두 검증을 조회 후 갱신으로 했기 때문에, 동시 요청에는 열려 있었습니다. 같은 한계를 두 번 확인하면서, 재발 방지는 사람의 주의가 아니라 구조로 해야 한다는 걸 배웠습니다.</p>
+      <p>다만 검증을 조회 후 갱신으로 했기 때문에 동시 요청에는 열려 있었고, 갱신 건수도 확인하지 않았습니다. 순서대로 들어오는 요청만 막는 검증은 동시성 방어가 아니라는 것을 이 사례로 정리했습니다.</p>
     </div>
   </div>
 </section>
@@ -765,7 +759,7 @@ UNIQUE (쇼핑몰, 원주문번호)</pre>
   <div class="wrap">
     <h2 id="more-title">그 밖의 작업</h2>
     <div class="more-grid">
-      <div class="more-item"><span class="mono">정산 · 2024.04 – 2025.06</span><h3>브랜드별 정산서와 로직 이관</h3><p>브랜드 단위 정산에 필요한 상품 브랜드 관리(2024.07–08)를 만들고, 브랜드별 정산서의 생성 가능 여부와 금액을 검증했습니다. 보관료와 할인 프로그램을 반영하고, 목록 조회·최종 확인·수기 회수 API와 엑셀 다운로드를 만들었습니다. 정산 프로시저를 애플리케이션으로 옮기며 택배 금액 계산 로직을 분리해 단위 테스트로 검증했고, 월간 송장 중복 정리 배치로 정합성을 맞췄습니다.</p></div>
+      <div class="more-item"><span class="mono">정산 · 2024.04 – 2025.06</span><h3>브랜드별 정산서와 로직 이관</h3><p>브랜드 단위 정산에 필요한 상품 브랜드 관리를 만들고, 브랜드별 정산서의 생성 가능 여부·금액 검증과 보관료·할인 반영, 확정·회수 API를 개발했습니다. 정산 프로시저를 애플리케이션으로 옮기며 택배 금액 계산 로직을 분리해 단위 테스트로 검증했습니다.</p></div>
       <div class="more-item"><span class="mono">운영 · 2022.09 – 2023.08</span><h3>운영 요청 줄이기</h3><p>운영팀과 물류 현장을 인터뷰해 요청을 반복·일회성·기능 부재로 나눴습니다. 반복 요청은 운영자 전용 API로 넘겨 월 90 → 40건으로 줄였습니다.</p></div>
       <div class="more-item"><span class="mono">반품 · 2022 – 2025</span><h3>반품 전체 흐름</h3><p>셀러 신청부터 창고 승인·처리까지 화면(JSP 5개)과 백엔드를 직접 개발했고, 2025년에 REST API로 전환했습니다.</p></div>
       <div class="more-item"><span class="mono">재고 · 2023 – 2024</span><h3>로케이션과 모바일 피킹</h3><p>로케이션 등록과 재고 이동, 모바일 피킹 바코드 스캔, 피킹지시서, 입출고 전 경로 trace log를 만들었습니다.</p></div>
@@ -789,7 +783,6 @@ UNIQUE (쇼핑몰, 원주문번호)</pre>
         <li>AI의 자기 검증 결과는 믿지 않고, 별도 감사를 돌립니다.</li>
         <li>역할별로 AI 세션을 나누되 결정은 제가 하고, 확정한 결정은 저장소의 결정 로그로 남깁니다.</li>
       </ul>
-      <p class="note">설계 사례(회원 탈퇴 파기, 기동 시점 설정 검증, 동의 이력)는 개인 프로젝트 포트폴리오에 따로 정리했습니다.</p>
     </div>
   </div>
 </section>
