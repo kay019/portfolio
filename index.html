@@ -5,6 +5,8 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
 <style>
+/* 화살표(→)는 IBM Plex Sans KR에 없어 시스템 한글 글꼴로 대체 */
+@font-face { font-family: "Arrows"; src: local("Apple SD Gothic Neo"), local("Malgun Gothic"), local("Noto Sans CJK KR"), local("Noto Sans KR"), local("NotoSansCJKkr-Regular"); unicode-range: U+2190-21FF; }
 /* Layout: 물류 송장(waybill) 문법. 사례마다 라벨 스트립(기간·역할·연동사·기술)을 달고, 본문은 문제 → 설계 → 결과 → 회고 순의 단일 칼럼 */
 :root {
   --bg: #f3f5f4;
@@ -18,7 +20,7 @@
   --marker-ink: #3a2e00;
   --good: #1f7a4d;
   --warn: #9a5b00;
-  --font-sans: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  --font-sans: "Arrows", "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
   --step--1: 0.8125rem;
   --step-0: 1rem;
@@ -234,7 +236,13 @@ footer .wrap { display: grid; gap: 6px; }
   pre.code { white-space: pre-wrap; overflow-wrap: anywhere; overflow: visible; }
   .nav { display: none; }
   body::before { display: none; }
-  section.case, .waybill, .result, .compare, figure.diagram { break-inside: avoid; }
+  section.case, .waybill, .result, .compare, figure.diagram, .split, .checks, .block, .retro { break-inside: avoid; }
+  .block h3, .block h3 .label { break-after: avoid; }
+  /* 흐름도는 인쇄 폭에 맞춰 노드를 줄인다 */
+  .flow { min-width: 0; }
+  .flow .node { min-width: 0; max-width: none; flex: 1 1 0; }
+  /* 리포트 계층도처럼 긴 그림은 페이지를 넘어도 된다 */
+  figure.diagram:has(.layers) { break-inside: auto; }
   section.case { break-before: page; }
   body { background: #fff; }
 }
@@ -243,12 +251,12 @@ footer .wrap { display: grid; gap: 6px; }
 <nav class="nav" aria-label="사례 바로가기">
   <div class="wrap">
     <strong>김정훈</strong>
-    <a href="#sync">연동 배치</a>
-    <a href="#cancel">출고 취소 이관</a>
     <a href="#report">대용량 리포트</a>
+    <a href="#sync">연동 배치</a>
     <a href="#settle">정산 쿼리</a>
-    <a href="#logging">로깅 개편</a>
     <a href="#global">해외 출고 검증</a>
+    <a href="#logging">로깅 개편</a>
+    <a href="#cancel">출고 취소 이관</a>
     <a href="#more">그 밖의 작업</a>
     <a href="#side">개인 프로젝트</a>
   </div>
@@ -279,163 +287,12 @@ footer .wrap { display: grid; gap: 6px; }
           <tr><td>정산 프로시저</td><td class="num">10분 → 1분 이내</td><td>단일 실행 처리 시간</td></tr>
           <tr><td>연동 관련 셀러 문의</td><td class="num">월 50 → 10건 (80% 감소)</td><td>월 셀러 문의 건수</td></tr>
           <tr><td>운영 요청</td><td class="num">월 90 → 40건 (약 56% 감소)</td><td>개발팀에 들어오던 건수</td></tr>
-          <tr><td>로그 수집량</td><td class="num">월 약 1,000만 → 약 10만 건</td><td>Datadog 월 수집 건수 · 요청 단위 traceId 추적 확보</td></tr>
+          <tr><td>로그 수집량</td><td class="num">월 약 1,000만 → 약 10만 건</td><td>Datadog 월 수집 건수</td></tr>
           <tr><td>대용량 리포트</td><td class="num">최대 100만 행</td><td>엑셀 행 기준, OOM 없음</td></tr>
         </tbody>
       </table>
     </div>
     <p class="note">회사 코드는 옮기지 않았습니다. 구조는 다이어그램으로 그렸고, 코드 블록은 모두 흐름을 설명하려고 새로 쓴 개념 예시입니다. 내부 클래스명·테이블명·상태 코드는 역할 이름으로 바꿨습니다.</p>
-  </div>
-</section>
-
-<!-- 사례: 연동 배치 -->
-<section class="case" id="sync" aria-labelledby="sync-title">
-  <div class="wrap">
-    <div class="waybill">
-      <div>
-        <div class="label">Case · 외부 연동</div>
-        <h2 id="sync-title">쇼핑몰 연동 배치 재설계</h2>
-        <p class="sub">실패 건이 어떤 상태로 끝났는지부터 분류해, 상태마다 처리 방법을 정했습니다.</p>
-      </div>
-      <div class="meta"><div><b>2024.01 – 2024.03</b></div><div>역할 <b>주도</b></div></div>
-      <div class="tickets">
-        <span class="chip">셀픽</span><span class="chip">플레이오토</span><span class="chip">카페24</span>
-        <span class="chip stack">Java 11</span><span class="chip stack">Spring Scheduler</span><span class="chip stack">MyBatis</span>
-      </div>
-    </div>
-
-    <div class="block">
-      <h3><span class="label">문제</span>실패한 주문·송장이 다시 처리되지 않았습니다</h3>
-      <p>외부 OMS·쇼핑몰과 주문·송장을 주고받다 실패한 건이 그대로 쌓였습니다. 셀러가 문의하면 제가 한 건씩 확인해서 다시 보냈습니다. 연동사마다 로직이 따로 흩어져 있어서, 고칠 때마다 다른 연동사에서 같은 문제가 다시 나왔습니다.</p>
-    </div>
-
-    <div class="block">
-      <h3><span class="label">목표</span>패치 대신, 실패가 상태별로 처리되는 구조</h3>
-      <p>같은 증상에 패치를 덧대지 않고, 실패 건이 사람 손을 거치지 않고 상태별로 처리되게 하는 것이 목표였습니다. 연동사가 늘어도 같은 흐름에 끼워 넣을 수 있어야 했습니다.</p>
-    </div>
-
-    <figure class="diagram">
-      <div class="branch">
-        <div class="node hot"><b>연동 실패 건</b><span class="mono">연동사별 조회 배치</span></div>
-        <div class="arrow"></div>
-        <div class="fan">
-          <div class="row"><span class="status">송장 완료</span><span>상대 시스템 상태를 확인하고 동기화</span></div>
-          <div class="row"><span class="status">출고 성공</span><span>후처리 후 연동 상태 갱신</span></div>
-          <div class="row"><span class="status">주문 취소</span><span>취소를 반영하고 재전송 대상에서 제외</span></div>
-          <div class="row"><span class="status">실패 · 3회 미만</span><span>재전송, 실패 횟수 증가</span></div>
-        </div>
-      </div>
-      <figcaption>실패 건을 네 가지 상태로 나누고, 상태마다 후처리나 재전송을 정했습니다.</figcaption>
-    </figure>
-
-    <div class="block">
-      <h3><span class="label">설계와 구현</span>공통 흐름은 하나로, 연동사 차이는 따로</h3>
-      <ul>
-        <li><b>구조</b>: 공통 연동 서비스가 조회·분류·재전송 흐름을 맡고, 연동사별 서비스는 각 연동사의 요청과 응답만 처리합니다.</li>
-        <li><b>응답 코드</b>: 연동사마다 다른 응답 코드를 Enum으로 정리해, 같은 기준으로 상태를 판단하게 했습니다.</li>
-        <li><b>rate limit</b>: 같은 셀러의 요청이 연달아 나가면 사이에 5초 딜레이를 넣었습니다.</li>
-        <li><b>재전송 한도</b>: 3회를 넘겨 실패한 건은 자동 재전송에서 빼고, 수동 재전송 API로 넘겼습니다.</li>
-        <li><b>중복 전송</b>: 한 배치 안에서 연동 주문·출고 주문 식별자 기준으로 중복을 걸러, 같은 건이 두 번 나가지 않게 했습니다.</li>
-        <li><b>수집 데이터 정제</b>: 주문을 수집할 때 공백·이모지 제거를 공통으로 처리했습니다.</li>
-        <li><b>정리</b>: 쓰지 않는 코드 약 750줄과 불필요한 트랜잭션을 걷어냈습니다.</li>
-      </ul>
-    </div>
-
-    <div class="result">
-      <span class="big">50 → 10건</span>
-      <p>실패 건이 상태별로 자동 처리되면서, 연동 관련 셀러 문의가 크게 줄었습니다.</p>
-      <span class="basis">기준: 월 셀러 문의 건수</span>
-    </div>
-
-    <div class="retro">
-      <div class="label">회고</div>
-      <p>자동화는 어디서 멈출지 정해야 끝납니다. 끝을 정하지 않은 재시도는 같은 실패를 반복할 뿐이라, 사람에게 넘기는 지점까지 설계에 넣어야 했습니다.</p>    </div>
-  </div>
-</section>
-
-<!-- 사례: 출고 취소 -->
-<section class="case" id="cancel" aria-labelledby="cancel-title">
-  <div class="wrap">
-    <div class="waybill">
-      <div>
-        <div class="label">Case · 정합성</div>
-        <h2 id="cancel-title">출고 취소를 프로시저에서 Java 서비스로</h2>
-        <p class="sub">취소 로직을 보이는 곳으로 꺼내 단계별로 검증했고, 남은 한계도 함께 적었습니다.</p>
-      </div>
-      <div class="meta"><div><b>2022.12</b></div><div>역할 <b>담당</b></div></div>
-      <div class="tickets">
-        <span class="chip stack">Spring</span><span class="chip stack">@Transactional</span><span class="chip stack">MyBatis</span><span class="chip stack">MySQL</span>
-      </div>
-    </div>
-
-    <div class="block">
-      <h3><span class="label">문제</span>취소가 겹치면 중간 상태가 어긋났습니다</h3>
-      <p>출고 취소는 DB 취소 프로시저 2개 안에 있었습니다. 같은 출고에 취소가 겹치면 회차·주문·상품 사이의 상태가 어긋났는데, 로직이 프로시저 안에 있어 어디서 어긋나는지 보기 어려웠습니다.</p>
-    </div>
-
-    <div class="block">
-      <h3><span class="label">목표</span>보이게 꺼내고, 한 번에 맞게</h3>
-      <p>취소 로직을 프로시저에서 코드로 꺼내 어디서 상태가 어긋나는지 보이게 하고, 회차·주문·상품 상태가 함께 바뀌게 하는 것이 목표였습니다.</p>
-    </div>
-
-    <figure class="diagram">
-      <div class="flow">
-        <div class="node"><b>단계별 상태 검증</b><span class="mono">이미 취소·출고 완료면<br>오류 코드로 거부</span></div>
-        <div class="arrow"></div>
-        <div class="node hot"><b>한 트랜잭션 갱신</b><span class="mono">회차·주문·상품을 함께,<br>실패하면 함께 롤백</span></div>
-        <div class="arrow"></div>
-        <div class="node"><b>배포 후 보완</b><span class="mono">상품 단위 중복 취소 차단<br>등 핫픽스 3건</span></div>
-      </div>
-      <figcaption>갱신 전에 회차·주문·상품 단계별 상태를 확인하고, 갱신은 서비스 단위 트랜잭션 하나로 묶었습니다.</figcaption>
-    </figure>
-
-    <div class="block">
-      <h3><span class="label">설계와 구현</span>프로시저를 걷어내고 단계를 나눴습니다</h3>
-      <ul>
-        <li>취소 프로시저를 제거하고, 회차 전체 취소와 주문 단위 취소를 Java 서비스 메서드로 나눴습니다.</li>
-        <li>갱신 전에 회차·주문·상품 단계별 상태를 조회해, 이미 취소됐거나 출고가 끝난 건은 각각의 오류 코드로 거부했습니다.</li>
-        <li>서비스에 클래스 단위 <span class="mono">@Transactional</span>을 걸어, 중간에 실패하면 회차·주문·상품 갱신이 함께 롤백되게 했습니다.</li>
-        <li>배포 뒤에는 상품 단위 중복 취소 차단, 출고 신청 중 취소 오류와 빈 <span class="mono">IN ()</span> 조건 방지, 신청 도중 이탈한 건 처리를 핫픽스로 보완했습니다.</li>
-      </ul>
-    </div>
-
-    <div class="compare">
-      <div>
-        <span class="label before">당시 구현 · 조회 후 갱신</span>
-        <span class="example-tag">개념 예시</span>
-        <pre class="code"><span class="c">-- 1) 상태를 먼저 조회해 검증</span>
-SELECT status FROM out_order WHERE id = ?;
-<span class="c">-- 이미 취소·완료면 예외</span>
-
-<span class="c">-- 2) 사용 중인 행만 조건으로 갱신</span>
-UPDATE out_order SET status = '취소'
- WHERE id = ? AND 사용여부 = 'Y';
-<span class="c">-- 갱신 0건이어도 그대로 진행</span></pre>
-        <p>검증과 갱신이 두 단계로 나뉘어, 동시에 들어온 요청이 둘 다 검증을 통과할 수 있었습니다. 갱신 건수가 0이어도 실패로 보지 않았습니다.</p>
-      </div>
-      <div>
-        <span class="label after">지금이라면</span>
-        <span class="example-tag">개념 예시</span>
-        <pre class="code"><span class="c">-- 현재 상태를 갱신 조건에 건다</span>
-UPDATE out_order SET status = '취소'
- WHERE id = ? AND status = ?;
-
-<span class="c">-- 0건이면 예외 → 트랜잭션 전체 롤백</span></pre>
-        <p>확인과 갱신을 한 문장으로 합치고 갱신 건수를 확인해, 동시에 온 요청 중 하나만 상태를 바꾸게 하겠습니다.</p>
-      </div>
-    </div>
-
-    <div class="result">
-      <span class="big" style="white-space:normal">중복 취소 거부·부분 갱신 방지</span>
-      <p>이미 취소·완료된 건을 거부하고 회차·주문·상품 갱신을 한 트랜잭션으로 묶어, 순서대로 들어온 중복 취소와 부분 갱신을 막았습니다.</p>
-      <span class="basis">2022.12 이관, 이후 핫픽스 3건 포함</span>
-    </div>
-
-    <div class="retro">
-      <div class="label">회고 · 지금이라면</div>
-      <p>로직을 프로시저에서 꺼내자 어디서 상태가 어긋나는지 보이기 시작했습니다. 이 결론은 이후 정산 로직을 애플리케이션으로 옮길 때도 그대로 이어졌습니다.</p>
-      <p>다만 검증을 조회 후 갱신으로 했기 때문에 동시 요청에는 열려 있었고, 갱신 건수도 확인하지 않았습니다. 순서대로 들어오는 요청만 막는 검증은 동시성 방어가 아니라는 것을 이 사례로 정리했습니다.</p>
-    </div>
   </div>
 </section>
 
@@ -513,6 +370,71 @@ UPDATE out_order SET status = '취소'
       <p>AI와 함께하니 혼자서는 다 따져보기 어려운 대안까지 비교할 수 있었지만, 어느 안을 고를지는 기존 구조와 운영 제약을 아는 사람이 정해야 했습니다.</p>
       <p>남은 약점도 있습니다. 주문번호 키 목록은 여전히 전체를 메모리에 올리고, MyBatis Cursor나 <span class="mono">fetchSize</span>는 쓰지 않았습니다. 생성은 동기이고 동시 생성 제한이 없습니다. 지금이라면 키 목록까지 없애고 keyset 페이지네이션이나 Cursor로 끝까지 스트리밍하고, 비동기 큐로 동시 생성 수를 제한하겠습니다.</p>
     </div>
+  </div>
+</section>
+
+<!-- 사례: 연동 배치 -->
+<section class="case" id="sync" aria-labelledby="sync-title">
+  <div class="wrap">
+    <div class="waybill">
+      <div>
+        <div class="label">Case · 외부 연동</div>
+        <h2 id="sync-title">쇼핑몰 연동 배치 재설계</h2>
+        <p class="sub">실패 건이 어떤 상태로 끝났는지부터 분류해, 상태마다 처리 방법을 정했습니다.</p>
+      </div>
+      <div class="meta"><div><b>2024.01 – 2024.03</b></div><div>역할 <b>주도</b></div></div>
+      <div class="tickets">
+        <span class="chip">셀픽</span><span class="chip">플레이오토</span><span class="chip">카페24</span>
+        <span class="chip stack">Java 11</span><span class="chip stack">Spring Scheduler</span><span class="chip stack">MyBatis</span>
+      </div>
+    </div>
+
+    <div class="block">
+      <h3><span class="label">문제</span>실패한 주문·송장이 다시 처리되지 않았습니다</h3>
+      <p>외부 OMS·쇼핑몰과 주문·송장을 주고받다 실패한 건이 그대로 쌓였습니다. 셀러가 문의하면 제가 한 건씩 확인해서 다시 보냈습니다. 연동사마다 로직이 따로 흩어져 있어서, 고칠 때마다 다른 연동사에서 같은 문제가 다시 나왔습니다.</p>
+    </div>
+
+    <div class="block">
+      <h3><span class="label">목표</span>패치 대신, 실패가 상태별로 처리되는 구조</h3>
+      <p>같은 증상에 패치를 덧대지 않고, 실패 건이 사람 손을 거치지 않고 상태별로 처리되게 하는 것이 목표였습니다. 연동사가 늘어도 같은 흐름에 끼워 넣을 수 있어야 했습니다.</p>
+    </div>
+
+    <figure class="diagram">
+      <div class="branch">
+        <div class="node hot"><b>연동 실패 건</b><span class="mono">연동사별 조회 배치</span></div>
+        <div class="arrow"></div>
+        <div class="fan">
+          <div class="row"><span class="status">송장 완료</span><span>상대 시스템 상태를 확인하고 동기화</span></div>
+          <div class="row"><span class="status">출고 성공</span><span>후처리 후 연동 상태 갱신</span></div>
+          <div class="row"><span class="status">주문 취소</span><span>취소를 반영하고 재전송 대상에서 제외</span></div>
+          <div class="row"><span class="status">실패 · 3회까지</span><span>재전송, 실패 횟수 증가</span></div>
+        </div>
+      </div>
+      <figcaption>실패 건을 네 가지 상태로 나누고, 상태마다 후처리나 재전송을 정했습니다.</figcaption>
+    </figure>
+
+    <div class="block">
+      <h3><span class="label">설계와 구현</span>공통 흐름은 하나로, 연동사 차이는 따로</h3>
+      <ul>
+        <li><b>구조</b>: 공통 연동 서비스가 조회·분류·재전송 흐름을 맡고, 연동사별 서비스는 각 연동사의 요청과 응답만 처리합니다.</li>
+        <li><b>응답 코드</b>: 연동사마다 다른 응답 코드를 Enum으로 정리해, 같은 기준으로 상태를 판단하게 했습니다.</li>
+        <li><b>rate limit</b>: 같은 셀러의 요청이 연달아 나가면 사이에 5초 딜레이를 넣었습니다.</li>
+        <li><b>재전송 한도</b>: 최대 3회까지 자동 재전송하고, 3번 실패한 건은 수동 재전송 API로 넘겼습니다.</li>
+        <li><b>중복 전송</b>: 한 배치 안에서 연동 주문·출고 주문 식별자 기준으로 중복을 걸러, 같은 건이 두 번 나가지 않게 했습니다.</li>
+        <li><b>수집 데이터 정제</b>: 주문을 수집할 때 공백·이모지 제거를 공통으로 처리했습니다.</li>
+        <li><b>정리</b>: 쓰지 않는 코드 약 750줄과 불필요한 트랜잭션을 걷어냈습니다.</li>
+      </ul>
+    </div>
+
+    <div class="result">
+      <span class="big">50 → 10건</span>
+      <p>실패 건이 상태별로 자동 처리되면서, 연동 관련 셀러 문의가 크게 줄었습니다.</p>
+      <span class="basis">기준: 월 셀러 문의 건수</span>
+    </div>
+
+    <div class="retro">
+      <div class="label">회고</div>
+      <p>자동화는 어디서 멈출지 정해야 끝납니다. 끝을 정하지 않은 재시도는 같은 실패를 반복할 뿐이라, 사람에게 넘기는 지점까지 설계에 넣어야 했습니다.</p>    </div>
   </div>
 </section>
 
@@ -600,6 +522,84 @@ key  : 복합 인덱스</pre>
   </div>
 </section>
 
+<!-- 사례: 해외 출고 -->
+<section class="case" id="global" aria-labelledby="global-title">
+  <div class="wrap">
+    <div class="waybill">
+      <div>
+        <div class="label">Case · 데이터 검증</div>
+        <h2 id="global-title">해외 출고 입력 단계 검증 체계</h2>
+        <p class="sub">출고 직전에 발견되던 오류를, 셀러가 엑셀을 올리는 순간에 잡았습니다.</p>
+      </div>
+      <div class="meta"><div><b>2024.11 – 2025.04</b></div><div>역할 <b>입력 검증 주도</b></div></div>
+      <div class="tickets">
+        <span class="chip stack">Spring Boot</span><span class="chip stack">JPA</span><span class="chip stack">QueryDSL</span><span class="chip stack">MyBatis</span><span class="chip stack">JUnit5</span>
+      </div>
+    </div>
+
+    <div class="block">
+      <h3><span class="label">문제</span>기능은 있었지만 쓰이지 못했습니다</h3>
+      <p>나라마다 주소와 이름 형식이 다른데 이를 검증하지 못해서, 오류가 창고에서 출고 직전에야 발견됐습니다. 해외 출고 기능은 있었지만 실제로는 국내 출고만 운영되고 있었습니다.</p>
+    </div>
+
+    <div class="block">
+      <h3><span class="label">목표</span>오류는 창고가 아니라 입력하는 순간에</h3>
+      <p>오류를 창고가 아니라 셀러가 입력하는 단계에서 잡아, 이미 있던 해외 출고 기능을 실제로 쓸 수 있게 만드는 것이 목표였습니다.</p>
+    </div>
+
+    <figure class="diagram">
+      <div class="flow">
+        <div class="node"><b>엑셀 업로드</b><span class="mono">해외출고 양식</span></div>
+        <div class="arrow"></div>
+        <div class="node hot"><b>행 단위 검증</b><span class="mono">주소·이름·우편번호·통관</span></div>
+        <div class="arrow"></div>
+        <div class="node"><b>오류 하이라이트</b><span class="mono">틀린 칸 위치 표시</span></div>
+        <div class="arrow"></div>
+        <div class="node"><b>출고 신청</b><span class="mono">검증 통과 건만</span></div>
+      </div>
+      <figcaption>셀러가 틀린 칸을 업로드 단계에서 바로 찾도록 단계마다 검증했습니다.</figcaption>
+    </figure>
+
+    <div class="checks" aria-label="검증 규칙">
+      <div class="check"><b>영문명 · 영문 주소</b><span>영문명·영문 주소 검증 보강</span></div>
+      <div class="check"><b>일본어 이름</b><span>일본 수취인 이름 검증 보강</span></div>
+      <div class="check"><b>일본 우편번호</b><span>유니코드 변형 포함 하이픈 12종을 지운 뒤 숫자 7자리 확인</span></div>
+      <div class="check"><b>통관 · 보험</b><span>통관 주소 문자 규칙, 보험 여부</span></div>
+      <div class="check"><b>숫자 정밀도</b><span>해외 주문 데이터의 소수점 처리</span></div>
+      <div class="check"><b>합배송</b><span>합배송 엑셀 오류 처리, 필수값 오류 표시 위치 보정</span></div>
+    </div>
+
+    <div class="split">
+      <div>
+        <span class="label">제가 직접 한 일</span>
+        <ul>
+          <li>해외출고 엑셀 양식 추가와 오류 처리 고도화</li>
+          <li>국가별 주소·이름 검증, 일본 우편번호 예외 처리</li>
+          <li>주소·이름·송하인 검증기 테스트</li>
+          <li>해외 배송사 공통 조회 API, 배송사 코드·조회 컬럼 추가</li>
+        </ul>
+      </div>
+      <div>
+        <span class="label">팀과 회사가 함께 만든 것</span>
+        <ul>
+          <li>지원 국가 확대(이후 10여 개국)는 회사의 사업 결정</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="result">
+      <span class="big">입력 단계 차단</span>
+      <p>주소·이름 형식 오류를 출고 전, 셀러가 업로드하는 단계에서 걸러내게 됐습니다. 입력 검증을 갖춘 뒤 해외 출고가 실제 운영에 쓰이기 시작했고, 이후 회사는 10여 개국으로 해외 배송을 넓혔습니다.</p>
+      <span class="basis">국가 확대는 회사가 진행했고, 저는 입력 단계 검증을 주도했습니다.</span>
+    </div>
+
+    <div class="retro">
+      <div class="label">회고</div>
+      <p>2022년 말 엑셀 업로드 오류 위치를 '열'에서 '행' 기준으로 바꾸면서 시작한 고민이었습니다. 오류는 늦게 발견할수록 비쌉니다. 창고에서 막는 것보다 셀러가 입력하는 순간에 막는 쪽이 현장의 일을 줄였습니다.</p>
+    </div>
+  </div>
+</section>
+
 <!-- 사례: 로깅 -->
 <section class="case" id="logging" aria-labelledby="logging-title">
   <div class="wrap">
@@ -678,80 +678,88 @@ MDC.put("traceId", UUID)
   </div>
 </section>
 
-<!-- 사례: 해외 출고 -->
-<section class="case" id="global" aria-labelledby="global-title">
+<!-- 사례: 출고 취소 -->
+<section class="case" id="cancel" aria-labelledby="cancel-title">
   <div class="wrap">
     <div class="waybill">
       <div>
-        <div class="label">Case · 데이터 검증</div>
-        <h2 id="global-title">해외 출고 입력 단계 검증 체계</h2>
-        <p class="sub">출고 직전에 발견되던 오류를, 셀러가 엑셀을 올리는 순간에 잡았습니다.</p>
+        <div class="label">Case · 정합성</div>
+        <h2 id="cancel-title">출고 취소를 프로시저에서 Java 서비스로</h2>
+        <p class="sub">취소 로직을 보이는 곳으로 꺼내 단계별로 검증했고, 남은 한계도 함께 적었습니다.</p>
       </div>
-      <div class="meta"><div><b>2024.11 – 2025.04</b></div><div>역할 <b>입력 검증 주도</b></div></div>
+      <div class="meta"><div><b>2022.12</b></div><div>역할 <b>담당</b></div></div>
       <div class="tickets">
-        <span class="chip stack">Spring Boot</span><span class="chip stack">JPA</span><span class="chip stack">QueryDSL</span><span class="chip stack">MyBatis</span><span class="chip stack">JUnit5</span>
+        <span class="chip stack">Spring</span><span class="chip stack">@Transactional</span><span class="chip stack">MyBatis</span><span class="chip stack">MySQL</span>
       </div>
     </div>
 
     <div class="block">
-      <h3><span class="label">문제</span>기능은 있었지만 쓰이지 못했습니다</h3>
-      <p>나라마다 주소와 이름 형식이 다른데 이를 검증하지 못해서, 오류가 창고에서 출고 직전에야 발견됐습니다. 해외 출고 기능은 있었지만 실제로는 국내 출고만 운영되고 있었습니다.</p>
+      <h3><span class="label">문제</span>취소가 겹치면 중간 상태가 어긋났습니다</h3>
+      <p>출고 취소는 DB 취소 프로시저 2개 안에 있었습니다. 같은 출고에 취소가 겹치면 회차·주문·상품 사이의 상태가 어긋났는데, 로직이 프로시저 안에 있어 어디서 어긋나는지 보기 어려웠습니다.</p>
     </div>
 
     <div class="block">
-      <h3><span class="label">목표</span>오류는 창고가 아니라 입력하는 순간에</h3>
-      <p>오류를 창고가 아니라 셀러가 입력하는 단계에서 잡아, 이미 있던 해외 출고 기능을 실제로 쓸 수 있게 만드는 것이 목표였습니다.</p>
+      <h3><span class="label">목표</span>보이게 꺼내고, 한 번에 맞게</h3>
+      <p>취소 로직을 프로시저에서 코드로 꺼내 어디서 상태가 어긋나는지 보이게 하고, 회차·주문·상품 상태가 함께 바뀌게 하는 것이 목표였습니다.</p>
     </div>
 
     <figure class="diagram">
       <div class="flow">
-        <div class="node"><b>엑셀 업로드</b><span class="mono">해외출고 양식</span></div>
+        <div class="node"><b>단계별 상태 검증</b><span class="mono">이미 취소·출고 완료면<br>오류 코드로 거부</span></div>
         <div class="arrow"></div>
-        <div class="node hot"><b>행 단위 검증</b><span class="mono">주소·이름·우편번호·통관</span></div>
+        <div class="node hot"><b>한 트랜잭션 갱신</b><span class="mono">회차·주문·상품을 함께,<br>실패하면 함께 롤백</span></div>
         <div class="arrow"></div>
-        <div class="node"><b>오류 하이라이트</b><span class="mono">틀린 칸 위치 표시</span></div>
-        <div class="arrow"></div>
-        <div class="node"><b>출고 신청</b><span class="mono">검증 통과 건만</span></div>
+        <div class="node"><b>배포 후 보완</b><span class="mono">상품 단위 중복 취소 차단<br>등 핫픽스 3건</span></div>
       </div>
-      <figcaption>셀러가 틀린 칸을 업로드 단계에서 바로 찾도록 단계마다 검증했습니다.</figcaption>
+      <figcaption>갱신 전에 회차·주문·상품 단계별 상태를 확인하고, 갱신은 서비스 단위 트랜잭션 하나로 묶었습니다.</figcaption>
     </figure>
 
-    <div class="checks" aria-label="검증 규칙">
-      <div class="check"><b>영문명 · 영문 주소</b><span>영문명·영문 주소 검증 보강</span></div>
-      <div class="check"><b>일본어 이름</b><span>일본 수취인 이름 검증 보강</span></div>
-      <div class="check"><b>일본 우편번호</b><span>유니코드 변형 포함 하이픈 12종을 지운 뒤 숫자 7자리 확인</span></div>
-      <div class="check"><b>통관 · 보험</b><span>통관 주소 문자 규칙, 보험 여부</span></div>
-      <div class="check"><b>숫자 정밀도</b><span>해외 주문 데이터의 소수점 처리</span></div>
-      <div class="check"><b>합배송</b><span>합배송 엑셀 오류 처리, 필수값 오류 표시 위치 보정</span></div>
+    <div class="block">
+      <h3><span class="label">설계와 구현</span>프로시저를 걷어내고 단계를 나눴습니다</h3>
+      <ul>
+        <li>취소 프로시저를 제거하고, 회차 전체 취소와 주문 단위 취소를 Java 서비스 메서드로 나눴습니다.</li>
+        <li>갱신 전에 회차·주문·상품 단계별 상태를 조회해, 이미 취소됐거나 출고가 끝난 건은 각각의 오류 코드로 거부했습니다.</li>
+        <li>서비스에 클래스 단위 <span class="mono">@Transactional</span>을 걸어, 중간에 실패하면 회차·주문·상품 갱신이 함께 롤백되게 했습니다.</li>
+        <li>배포 뒤에는 상품 단위 중복 취소 차단, 출고 신청 중 취소 오류와 빈 <span class="mono">IN ()</span> 조건 방지, 신청 도중 이탈한 건 처리를 핫픽스로 보완했습니다.</li>
+      </ul>
     </div>
 
-    <div class="split">
+    <div class="compare">
       <div>
-        <span class="label">제가 직접 한 일</span>
-        <ul>
-          <li>해외출고 엑셀 양식 추가와 오류 처리 고도화</li>
-          <li>국가별 주소·이름 검증, 일본 우편번호 예외 처리</li>
-          <li>주소·이름·송하인 검증기 테스트</li>
-          <li>해외 배송사 공통 조회 API, 배송사 코드·조회 컬럼 추가</li>
-        </ul>
+        <span class="label before">당시 구현 · 조회 후 갱신</span>
+        <span class="example-tag">개념 예시</span>
+        <pre class="code"><span class="c">-- 1) 상태를 먼저 조회해 검증</span>
+SELECT status FROM out_order WHERE id = ?;
+<span class="c">-- 이미 취소·완료면 예외</span>
+
+<span class="c">-- 2) 사용 중인 행만 조건으로 갱신</span>
+UPDATE out_order SET status = '취소'
+ WHERE id = ? AND 사용여부 = 'Y';
+<span class="c">-- 갱신 0건이어도 그대로 진행</span></pre>
+        <p>검증과 갱신이 두 단계로 나뉘어, 동시에 들어온 요청이 둘 다 검증을 통과할 수 있었습니다. 갱신 건수가 0이어도 실패로 보지 않았습니다.</p>
       </div>
       <div>
-        <span class="label">팀과 회사가 함께 만든 것</span>
-        <ul>
-          <li>지원 국가 확대(이후 10여 개국)는 회사의 사업 결정</li>
-        </ul>
+        <span class="label after">지금이라면</span>
+        <span class="example-tag">개념 예시</span>
+        <pre class="code"><span class="c">-- 현재 상태를 갱신 조건에 건다</span>
+UPDATE out_order SET status = '취소'
+ WHERE id = ? AND status = ?;
+
+<span class="c">-- 0건이면 예외 → 트랜잭션 전체 롤백</span></pre>
+        <p>확인과 갱신을 한 문장으로 합치고 갱신 건수를 확인해, 동시에 온 요청 중 하나만 상태를 바꾸게 하겠습니다.</p>
       </div>
     </div>
 
     <div class="result">
-      <span class="big">입력 단계 차단</span>
-      <p>주소·이름 형식 오류를 출고 전, 셀러가 업로드하는 단계에서 걸러내게 됐습니다. 입력 검증을 갖춘 뒤 해외 출고가 실제 운영에 쓰이기 시작했고, 이후 회사는 10여 개국으로 해외 배송을 넓혔습니다.</p>
-      <span class="basis">국가 확대는 회사가 진행했고, 저는 입력 단계 검증을 주도했습니다.</span>
+      <span class="big" style="white-space:normal">중복 취소 거부·부분 갱신 방지</span>
+      <p>이미 취소·완료된 건을 거부하고 회차·주문·상품 갱신을 한 트랜잭션으로 묶어, 순서대로 들어온 중복 취소와 부분 갱신을 막았습니다.</p>
+      <span class="basis">2022.12 이관, 이후 핫픽스 3건 포함</span>
     </div>
 
     <div class="retro">
-      <div class="label">회고</div>
-      <p>2022년 말 엑셀 업로드 오류 위치를 '열'에서 '행' 기준으로 바꾸면서 시작한 고민이었습니다. 오류는 늦게 발견할수록 비쌉니다. 창고에서 막는 것보다 셀러가 입력하는 순간에 막는 쪽이 현장의 일을 줄였습니다.</p>
+      <div class="label">회고 · 지금이라면</div>
+      <p>로직을 프로시저에서 꺼내자 어디서 상태가 어긋나는지 보이기 시작했습니다. 이 결론은 이후 정산 로직을 애플리케이션으로 옮길 때도 그대로 이어졌습니다.</p>
+      <p>다만 검증을 조회 후 갱신으로 했기 때문에 동시 요청에는 열려 있었고, 갱신 건수도 확인하지 않았습니다. 순서대로 들어오는 요청만 막는 검증은 동시성 방어가 아니라는 것을 이 사례로 정리했습니다.</p>
     </div>
   </div>
 </section>
