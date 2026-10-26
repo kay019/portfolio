@@ -236,13 +236,16 @@ footer .wrap { display: grid; gap: 6px; }
   pre.code { white-space: pre-wrap; overflow-wrap: anywhere; overflow: visible; }
   .nav { display: none; }
   body::before { display: none; }
-  section.case, .waybill, .result, .compare, figure.diagram, .split, .checks, .block, .retro { break-inside: avoid; }
+  section.case, .waybill, .result, .compare, figure.diagram, .split, .checks, .retro p, .block li { break-inside: avoid; }
+  .retro .label { break-after: avoid; }
   .block h3, .block h3 .label { break-after: avoid; }
   /* 흐름도는 인쇄 폭에 맞춰 노드를 줄인다 */
   .flow { min-width: 0; }
+  .diagram { padding: 12px; }
+  .layers { gap: 4px; }
+  .layer > div:first-child { padding: 6px 10px; }
+  .layer > div:last-child { padding: 5px 10px; }
   .flow .node { min-width: 0; max-width: none; flex: 1 1 0; }
-  /* 리포트 계층도처럼 긴 그림은 페이지를 넘어도 된다 */
-  figure.diagram:has(.layers) { break-inside: auto; }
   section.case { break-before: page; }
   body { background: #fff; }
 }
